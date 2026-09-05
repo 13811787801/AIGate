@@ -9,10 +9,13 @@
 
 | 阶段 | 状态 |
 |---|---|
-| Phase 0 建仓 / 骨架 / 健康检查 | **已完成（本机已跑通 `/healthz`）** |
-| One API 体检 | **结论：不整仓 Fork，作参考**（见 docs/07） |
-| Phase 1 鉴权·渠道·计费·Chat | 未开始 |
+| Phase 0 建仓 / 骨架 / 健康检查 | ✅ |
+| One API 体检 | ✅ 不整仓 Fork |
+| **Phase 1 鉴权·渠道·计费·Chat** | **✅ 已完成（含 mock + openai_compatible）** |
+| Phase 2 控制台 UI | 未开始 |
 | Phase 4+ Python 插件 | 未开始 |
+
+验收文档：[docs/01-Phase1验收与接本地模型.md](docs/01-Phase1验收与接本地模型.md)
 
 ## Go 工具链（本机）
 
@@ -77,7 +80,8 @@ Invoke-RestMethod http://127.0.0.1:3000/healthz
 
 | 文档 | 说明 |
 |---|---|
-| [Go 环境安装与使用（白丁版）](docs/03-Go环境安装与使用手册.md) | **先看这个**：winget/MSI、验收清单 |
+| [Phase1 验收与本地模型](docs/01-Phase1验收与接本地模型.md) | **联调入口** |
+| [Go 环境安装与使用（白丁版）](docs/03-Go环境安装与使用手册.md) | winget/MSI、验收清单 |
 | [Go 避坑与排障速查](docs/04-Go开发避坑与排障速查.md) | 报错解读、语法对照、常犯错误 |
 | [AIGate-Pro技术规格书](docs/AIGate-Pro技术规格书.md) | 产品与领域模型 V4 |
 | [架构补丁 V4.1](docs/架构补丁-V4.1-Go与Python插件.md) | Go + Python 插件 + 本地模型 |
