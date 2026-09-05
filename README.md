@@ -11,11 +11,12 @@
 |---|---|
 | Phase 0 建仓 / 骨架 / 健康检查 | ✅ |
 | One API 体检 | ✅ 不整仓 Fork |
-| **Phase 1 鉴权·渠道·计费·Chat** | **✅ 已完成（含 mock + openai_compatible）** |
-| Phase 2 控制台 UI | 未开始 |
+| **Phase 1 鉴权·渠道·计费·Chat** | ✅ |
+| **Phase 2 控制台 UI** | **✅ 已完成（内嵌网页控制台）** |
 | Phase 4+ Python 插件 | 未开始 |
 
-验收文档：[docs/01-Phase1验收与接本地模型.md](docs/01-Phase1验收与接本地模型.md)
+打开控制台：**http://127.0.0.1:3000/**（先 `.\scripts\start-background.ps1`）  
+说明：[docs/01-Phase2控制台说明.md](docs/01-Phase2控制台说明.md)
 
 ## Go 工具链（本机）
 
@@ -80,7 +81,8 @@ Invoke-RestMethod http://127.0.0.1:3000/healthz
 
 | 文档 | 说明 |
 |---|---|
-| [Phase1 验收与本地模型](docs/01-Phase1验收与接本地模型.md) | **联调入口** |
+| [Phase2 控制台说明](docs/01-Phase2控制台说明.md) | **打开网页从这里** |
+| [Phase1 验收与本地模型](docs/01-Phase1验收与接本地模型.md) | API / Ollama 联调 |
 | [Go 环境安装与使用（白丁版）](docs/03-Go环境安装与使用手册.md) | winget/MSI、验收清单 |
 | [Go 避坑与排障速查](docs/04-Go开发避坑与排障速查.md) | 报错解读、语法对照、常犯错误 |
 | [AIGate-Pro技术规格书](docs/AIGate-Pro技术规格书.md) | 产品与领域模型 V4 |

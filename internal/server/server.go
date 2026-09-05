@@ -66,13 +66,30 @@ func Run(cfg *config.Config) error {
 	mux.HandleFunc("/healthz", app.handleHealth)
 	mux.HandleFunc("/v1/models", app.handleModels)
 	mux.HandleFunc("/v1/chat/completions", app.handleChat)
+
+	// Phase1 bootstrap (header token)
 	mux.HandleFunc("/api/admin/channels", app.handleAdminChannels)
 	mux.HandleFunc("/api/admin/models", app.handleAdminModels)
 	mux.HandleFunc("/api/admin/wallet", app.handleAdminWallet)
 
+	// Phase2 console API (JWT)
+	mux.HandleFunc("/api/auth/login", app.handleLogin)
+	mux.HandleFunc("/api/me", app.handleMe)
+	mux.HandleFunc("/api/wallet", app.handleConsoleWallet)
+	mux.HandleFunc("/api/keys", app.handleConsoleKeys)
+	mux.HandleFunc("/api/logs", app.handleConsoleLogs)
+	mux.HandleFunc("/api/models", app.handleConsoleModels)
+	mux.HandleFunc("/api/chat", app.handleConsoleChat)
+	mux.HandleFunc("/api/admin/overview", app.handleAdminOverview)
+	mux.HandleFunc("/api/admin/console/channels", app.handleAdminChannelsJWT)
+	mux.HandleFunc("/api/admin/console/models", app.handleAdminModelsJWT)
+
+	mux.Handle("/", consoleFileServer())
+
 	addr := cfg.Addr()
-	log.Printf("AIGate Phase1 listening on http://%s", addr)
-	log.Printf("health: http://127.0.0.1:%d/healthz", cfg.Server.Port)
+	log.Printf("AIGate listening on http://%s", addr)
+	log.Printf("Console UI: http://127.0.0.1:%d/", cfg.Server.Port)
+	log.Printf("Health:     http://127.0.0.1:%d/healthz", cfg.Server.Port)
 	return http.ListenAndServe(addr, withAccessLog(mux))
 }
 
@@ -80,7 +97,7 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"service": "aigate",
-		"phase":   1,
+		"phase":   2,
 		"time":    time.Now().UTC().Format(time.RFC3339),
 	})
 }

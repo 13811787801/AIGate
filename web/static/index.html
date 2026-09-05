@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIGate 控制台</title>
+  <link rel="stylesheet" href="/assets/app.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Login -->
+    <section id="view-login" class="login-wrap hidden">
+      <div class="login-card">
+        <div class="brand">
+          <div class="logo">AG</div>
+          <div>
+            <h1>AIGate</h1>
+            <p>企业私有化 AI API 网关</p>
+          </div>
+        </div>
+        <label>用户名</label>
+        <input id="login-user" value="admin" autocomplete="username" />
+        <label>密码</label>
+        <input id="login-pass" type="password" value="admin123" autocomplete="current-password" />
+        <button id="btn-login" class="btn primary">登录</button>
+        <p class="hint">默认账号来自配置：admin / admin123（请上线后修改）</p>
+        <p id="login-error" class="error"></p>
+      </div>
+    </section>
+
+    <!-- Shell -->
+    <section id="view-shell" class="shell hidden">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="logo sm">AG</div>
+          <div>
+            <strong>AIGate</strong>
+            <small id="side-user">—</small>
+          </div>
+        </div>
+        <nav id="nav">
+          <button data-page="overview">总览</button>
+          <button data-page="chat">对话调试</button>
+          <button data-page="keys">令牌管理</button>
+          <button data-page="logs">使用日志</button>
+          <button data-page="wallet">钱包</button>
+          <div class="nav-sep admin-only">管理</div>
+          <button class="admin-only" data-page="channels">渠道配置</button>
+          <button class="admin-only" data-page="models">模型配置</button>
+        </nav>
+        <button id="btn-logout" class="btn ghost logout">退出登录</button>
+      </aside>
+      <main class="main">
+        <header class="topbar">
+          <h2 id="page-title">总览</h2>
+          <div class="top-actions">
+            <span id="balance-pill" class="pill">余额 —</span>
+          </div>
+        </header>
+        <div id="page" class="page"></div>
+      </main>
+    </section>
+  </div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
