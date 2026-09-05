@@ -16,11 +16,11 @@
 
 ## Go 工具链（本机）
 
-便携 Go 安装在（**不在**仓库内，避免污染 module）：
+**推荐**：系统安装（winget/MSI）→ `C:\Program Files\Go\bin\go.exe`  
+详见：[docs/03-Go环境安装与使用手册.md](docs/03-Go环境安装与使用手册.md)
 
-`E:\Projects\.toolchain\go`
-
-脚本 `scripts\dev-run.ps1` / `build-windows.ps1` 会自动使用该路径。
+备用便携目录（可选）：`E:\Projects\.toolchain\go`  
+脚本优先用系统 `go`，找不到再回退便携版。
 
 
 ## 仓库结构
@@ -77,10 +77,12 @@ Invoke-RestMethod http://127.0.0.1:3000/healthz
 
 | 文档 | 说明 |
 |---|---|
+| [Go 环境安装与使用（白丁版）](docs/03-Go环境安装与使用手册.md) | **先看这个**：winget/MSI、验收清单 |
+| [Go 避坑与排障速查](docs/04-Go开发避坑与排障速查.md) | 报错解读、语法对照、常犯错误 |
 | [AIGate-Pro技术规格书](docs/AIGate-Pro技术规格书.md) | 产品与领域模型 V4 |
 | [架构补丁 V4.1](docs/架构补丁-V4.1-Go与Python插件.md) | Go + Python 插件 + 本地模型 |
 | [技术选型与部署学习](docs/技术选型决议与部署学习规范.md) | 选型决议、排障树 |
-| [无 Docker 部署 · Windows](docs/02-无Docker部署手册-Windows.md) | 你要学的安装步骤 |
+| [无 Docker 部署 · Windows](docs/02-无Docker部署手册-Windows.md) | 安装步骤 |
 | [One API 体检结论](docs/07-OneAPI体检结论.md) | 不整仓 Fork，参考实现 |
 | [开源参考说明](docs/06-开源协议与合规.md) | One API MIT / 禁止默认 AGPL |
 

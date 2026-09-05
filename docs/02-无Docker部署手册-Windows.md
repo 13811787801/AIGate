@@ -8,10 +8,16 @@
 ## 前置
 
 1. 已安装 **Git**
-2. 已安装 **Go 1.22+**（`go version` 有输出）
+2. 已按 [03-Go环境安装与使用手册](./03-Go环境安装与使用手册.md) 装好 **Go 1.22+**
 3. 项目在 `E:\Projects\AIGate`
 
-若 `go` 命令找不到：安装后**重新打开** PowerShell，或确认 `%USERPROFILE%\go` 与 `C:\Program Files\Go\bin` 在 PATH。
+验证：
+
+```powershell
+go version
+where.exe go
+# 期望包含：C:\Program Files\Go\bin\go.exe
+```
 
 ## 步骤
 
