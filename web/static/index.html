@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AIGate 控制台</title>
+  <title>AIGate · 企业 AI 网关</title>
   <link rel="stylesheet" href="/assets/app.css" />
 </head>
 <body>
@@ -15,50 +15,63 @@
           <div class="logo">AG</div>
           <div>
             <h1>AIGate</h1>
-            <p>企业私有化 AI API 网关</p>
+            <p>企业私有化 AI API 网关控制台</p>
           </div>
         </div>
         <label>用户名</label>
         <input id="login-user" value="admin" autocomplete="username" />
         <label>密码</label>
         <input id="login-pass" type="password" value="admin123" autocomplete="current-password" />
-        <button id="btn-login" class="btn primary">登录</button>
-        <p class="hint">默认账号来自配置：admin / admin123（请上线后修改）</p>
+        <button id="btn-login" class="btn primary">登录控制台</button>
+        <p class="hint">默认：admin / admin123（生产环境请立即修改）</p>
         <p id="login-error" class="error"></p>
       </div>
     </section>
 
-    <!-- Shell -->
-    <section id="view-shell" class="shell hidden">
-      <aside class="sidebar">
-        <div class="sidebar-brand">
+    <!-- App shell -->
+    <section id="view-shell" class="app-shell hidden">
+      <header class="topnav">
+        <div class="topnav-left">
           <div class="logo sm">AG</div>
-          <div>
-            <strong>AIGate</strong>
-            <small id="side-user">—</small>
-          </div>
+          <strong class="product-name">AIGate</strong>
+          <nav class="top-links">
+            <button type="button" data-page="overview" class="top-link">控制台</button>
+            <button type="button" data-page="marketplace" class="top-link">模型广场</button>
+            <button type="button" data-page="docs" class="top-link">接入说明</button>
+          </nav>
         </div>
-        <nav id="nav">
-          <button data-page="overview">总览</button>
-          <button data-page="chat">对话调试</button>
+        <div class="topnav-right">
+          <span id="balance-pill" class="pill">余额 —</span>
+          <span id="top-user" class="user-chip">—</span>
+          <button id="btn-logout" class="btn ghost sm">退出</button>
+        </div>
+      </header>
+
+      <div class="body">
+        <aside class="sidebar">
+          <div class="nav-group">聊天</div>
+          <button data-page="chat">操练场</button>
+          <div class="nav-group">控制台</div>
+          <button data-page="overview">数据看板</button>
           <button data-page="keys">令牌管理</button>
           <button data-page="logs">使用日志</button>
-          <button data-page="wallet">钱包</button>
-          <div class="nav-sep admin-only">管理</div>
-          <button class="admin-only" data-page="channels">渠道配置</button>
-          <button class="admin-only" data-page="models">模型配置</button>
-        </nav>
-        <button id="btn-logout" class="btn ghost logout">退出登录</button>
-      </aside>
-      <main class="main">
-        <header class="topbar">
-          <h2 id="page-title">总览</h2>
-          <div class="top-actions">
-            <span id="balance-pill" class="pill">余额 —</span>
+          <button data-page="wallet">钱包管理</button>
+          <div class="nav-group admin-only">系统管理</div>
+          <button class="admin-only" data-page="channels">渠道管理</button>
+          <button class="admin-only" data-page="models-admin">模型管理</button>
+          <p class="side-foot" id="side-user">—</p>
+        </aside>
+
+        <main class="main">
+          <div class="main-head">
+            <div>
+              <h2 id="page-title">数据看板</h2>
+              <p id="page-sub" class="page-sub">概览账户与平台状态</p>
+            </div>
           </div>
-        </header>
-        <div id="page" class="page"></div>
-      </main>
+          <div id="page" class="page"></div>
+        </main>
+      </div>
     </section>
   </div>
   <script src="/assets/app.js"></script>

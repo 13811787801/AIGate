@@ -81,7 +81,8 @@ Invoke-RestMethod http://127.0.0.1:3000/healthz
 
 | 文档 | 说明 |
 |---|---|
-| [Phase2 控制台说明](docs/01-Phase2控制台说明.md) | **打开网页从这里** |
+| [商业化对标与阶段门禁](docs/08-商业化对标与阶段门禁.md) | **Mock→商业化强制门禁** |
+| [Phase2 控制台说明](docs/01-Phase2控制台说明.md) | 打开网页从这里 |
 | [Phase1 验收与本地模型](docs/01-Phase1验收与接本地模型.md) | API / Ollama 联调 |
 | [Go 环境安装与使用（白丁版）](docs/03-Go环境安装与使用手册.md) | winget/MSI、验收清单 |
 | [Go 避坑与排障速查](docs/04-Go开发避坑与排障速查.md) | 报错解读、语法对照、常犯错误 |
