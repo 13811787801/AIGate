@@ -6,8 +6,8 @@
 *.exe
 *.test
 *.out
-aigate
-aigate.exe
+/aigate
+/aigate.exe
 
 # Local toolchain (do not commit)
 /tools/
