@@ -1,0 +1,21 @@
+services:
+  # 可选：客户已有 Docker 时再用。默认交付不依赖本文件。
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: aigate
+      MYSQL_USER: aigate
+      MYSQL_PASSWORD: aigate
+    ports:
+      - "3306:3306"
+    volumes:
+      - aigate_mysql:/var/lib/mysql
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  aigate_mysql:

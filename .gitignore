@@ -1,0 +1,38 @@
+# Binaries / build
+/bin/
+/dist/
+/data/
+/logs/
+*.exe
+*.test
+*.out
+aigate
+aigate.exe
+
+# Local toolchain (do not commit)
+/tools/
+go.zip
+
+# Config with secrets
+/configs/config.yaml
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Go
+/vendor/
+
+# Node (future web)
+/web/node_modules/
+/web/dist/
+
+# Reference clone build artifacts
+reference/one-api/
