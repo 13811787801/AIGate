@@ -8,8 +8,8 @@
 ## 前置
 
 1. 已安装 **Git**
-2. 已按 [03-Go环境安装与使用手册](./03-Go环境安装与使用手册.md) 装好 **Go 1.22+**
-3. 项目在 `E:\Projects\AIGate`
+2. 已安装 **Go 1.22+**（`go version` 可用）
+3. 已克隆本仓库
 
 验证：
 
@@ -22,7 +22,7 @@ where.exe go
 ## 步骤
 
 ```powershell
-cd E:\Projects\AIGate
+cd AIGate
 Copy-Item configs\config.example.yaml configs\config.yaml
 # 编辑 configs\config.yaml：修改 jwt_secret 与 admin_password
 .\scripts\dev-run.ps1

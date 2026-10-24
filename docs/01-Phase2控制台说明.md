@@ -46,6 +46,6 @@
 ## 启动
 
 ```powershell
-cd E:\Projects\AIGate
+cd AIGate
 .\scripts\start-background.ps1
 ```

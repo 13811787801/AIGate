@@ -20,7 +20,7 @@
 ## 快速验收
 
 ```powershell
-cd E:\Projects\AIGate
+cd AIGate
 # 若要重新种子（会清库）：
 Remove-Item data\aigate.db* -ErrorAction SilentlyContinue
 .\scripts\build-windows.ps1

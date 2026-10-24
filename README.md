@@ -18,13 +18,10 @@
 打开控制台：**http://127.0.0.1:3000/**（先 `.\scripts\start-background.ps1`）  
 说明：[docs/01-Phase2控制台说明.md](docs/01-Phase2控制台说明.md)
 
-## Go 工具链（本机）
+## Go 工具链
 
-**推荐**：系统安装（winget/MSI）→ `C:\Program Files\Go\bin\go.exe`  
-详见：[docs/03-Go环境安装与使用手册.md](docs/03-Go环境安装与使用手册.md)
-
-备用便携目录（可选）：`E:\Projects\.toolchain\go`  
-脚本优先用系统 `go`，找不到再回退便携版。
+安装 **Go 1.22+**，并确认终端里 `go version` 可用。  
+Windows 脚本优先使用系统里的 `go`。
 
 
 ## 仓库结构
@@ -51,7 +48,7 @@ AIGate/
 ### 2. 配置
 
 ```powershell
-cd E:\Projects\AIGate
+cd AIGate
 Copy-Item configs\config.example.yaml configs\config.yaml
 ```
 
@@ -81,17 +78,13 @@ Invoke-RestMethod http://127.0.0.1:3000/healthz
 
 | 文档 | 说明 |
 |---|---|
-| [商业化对标与阶段门禁](docs/08-商业化对标与阶段门禁.md) | **Mock→商业化强制门禁** |
-| [Phase2 控制台说明](docs/01-Phase2控制台说明.md) | 打开网页从这里 |
-| [Phase1 验收与本地模型](docs/01-Phase1验收与接本地模型.md) | API / Ollama 联调 |
-| [Go 环境安装与使用（白丁版）](docs/03-Go环境安装与使用手册.md) | winget/MSI、验收清单 |
-| [Go 避坑与排障速查](docs/04-Go开发避坑与排障速查.md) | 报错解读、语法对照、常犯错误 |
-| [AIGate-Pro技术规格书](docs/AIGate-Pro技术规格书.md) | 产品与领域模型 V4 |
+| [控制台说明](docs/01-Phase2控制台说明.md) | 打开网页从这里 |
+| [验收与本地模型](docs/01-Phase1验收与接本地模型.md) | API / Ollama 联调 |
+| [技术规格书](docs/AIGate-Pro技术规格书.md) | 产品与领域模型 |
 | [架构补丁 V4.1](docs/架构补丁-V4.1-Go与Python插件.md) | Go + Python 插件 + 本地模型 |
-| [技术选型与部署学习](docs/技术选型决议与部署学习规范.md) | 选型决议、排障树 |
 | [无 Docker 部署 · Windows](docs/02-无Docker部署手册-Windows.md) | 安装步骤 |
-| [One API 体检结论](docs/07-OneAPI体检结论.md) | 不整仓 Fork，参考实现 |
-| [开源参考说明](docs/06-开源协议与合规.md) | One API MIT / 禁止默认 AGPL |
+| [数据库备份与恢复](docs/15-数据库备份与恢复手册.md) | SQLite / MySQL |
+| [开源协议与合规](docs/06-开源协议与合规.md) | MIT；禁止把 AGPL 代码混入本仓库 |
 
 拉取参考代码（可选）：
 

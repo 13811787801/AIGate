@@ -36,3 +36,17 @@ Thumbs.db
 
 # Reference clone build artifacts
 reference/one-api/
+
+# Local development notes (kept on disk, not published)
+/docs/00-Phase0清单.md
+/docs/00-Phase1清单.md
+/docs/00-Phase2清单.md
+/docs/00-Phase3清单.md
+/docs/03-Go环境安装与使用手册.md
+/docs/04-Go开发避坑与排障速查.md
+/docs/07-OneAPI体检结论.md
+/docs/08-商业化对标与阶段门禁.md
+/docs/12-里程碑M2-基线需求与测试用例.md
+/docs/13-里程碑M2-阶段性验收评审报告.md
+/docs/14-里程碑M3-需求与验收.md
+/docs/技术选型决议与部署学习规范.md

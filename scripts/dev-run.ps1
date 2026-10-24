@@ -29,8 +29,7 @@ function Resolve-Go {
 
 $goBin = Resolve-Go
 if (-not $goBin) {
-  Write-Host "未找到 go。请先按文档安装：" -ForegroundColor Red
-  Write-Host "  docs\03-Go环境安装与使用手册.md" -ForegroundColor Yellow
+  Write-Host "未找到 go。请先安装 Go 1.22+ 并加入 PATH。" -ForegroundColor Red
   exit 1
 }
 
