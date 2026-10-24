@@ -50,3 +50,13 @@ reference/one-api/
 /docs/13-里程碑M2-阶段性验收评审报告.md
 /docs/14-里程碑M3-需求与验收.md
 /docs/技术选型决议与部署学习规范.md
+/docs/01-Phase1验收与接本地模型.md
+/docs/01-Phase2控制台说明.md
+/docs/02-无Docker部署手册-Windows.md
+/docs/06-开源协议与合规.md
+/docs/09-可插拔交付与私有化形态.md
+/docs/10-权益与防越狱.md
+/docs/11-双模式运营模型.md
+/docs/15-数据库备份与恢复手册.md
+/docs/AIGate-Pro技术规格书.md
+/docs/架构补丁-V4.1-Go与Python插件.md

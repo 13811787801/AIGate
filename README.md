@@ -1,106 +1,42 @@
-# AIGate-Pro
+# AIGate
 
-可私有化部署的企业级 AI API 网关（OpenAI 兼容）。
+可私有部署的 AI API 网关。对外提供 OpenAI 兼容接口，对内用网页控制台管理渠道、模型、令牌和用量。
 
-> **技术路线（已锁定）**：Go 主网关 + Python 后期插件 + 本地/云模型统一渠道。  
-> 规格见 `docs/`。
+服务端与网页控制台以 [MIT](LICENSE) 许可发布。
 
-## 当前进度
+## 它做什么
 
-| 阶段 | 状态 |
+- 把各家模型厂商、以及本机的 OpenAI 兼容服务，收成统一的 `/v1` 接口
+- 用网页控制台配置渠道、发布模型、签发调用令牌、查看日志和余额
+- 操练场支持多轮对话，会话保存在本机数据库
+- 按 token 计费：调用前预扣，结束后按实际用量结算
+- DeepSeek 渠道可以按请求开启联网搜索
+
+## 文档
+
+| 文档 | 内容 |
 |---|---|
-| Phase 0 建仓 / 骨架 / 健康检查 | ✅ |
-| One API 体检 | ✅ 不整仓 Fork |
-| **Phase 1 鉴权·渠道·计费·Chat** | ✅ |
-| **Phase 2 控制台 UI** | **✅ 已完成（内嵌网页控制台）** |
-| Phase 4+ Python 插件 | 未开始 |
+| [项目说明书](docs/项目说明书.md) | 功能、使用对象、仓库里有什么 |
+| [部署与使用](docs/部署与使用.md) | 安装、配置、控制台、接入客户端、备份 |
 
-打开控制台：**http://127.0.0.1:3000/**（先 `.\scripts\start-background.ps1`）  
-说明：[docs/01-Phase2控制台说明.md](docs/01-Phase2控制台说明.md)
+## 最快跑起来
 
-## Go 工具链
-
-安装 **Go 1.22+**，并确认终端里 `go version` 可用。  
-Windows 脚本优先使用系统里的 `go`。
-
-
-## 仓库结构
-
-```text
-AIGate/
-├── cmd/aigate/          # 主程序入口
-├── internal/            # 业务包（auth/billing/channel/...）
-├── pkg/                 # 可复用小库
-├── configs/             # 配置样例
-├── deploy/              # Windows / Linux / Compose 部署
-├── docs/                # 规格、选型、排障、部署手册
-├── reference/one-api/   # MIT 参考实现（只读参考，不直接当生产依赖）
-├── scripts/             # 开发脚本
-└── web/                 # 前端（后续）
-```
-
-## 快速开始（Windows，无 Docker）
-
-### 1. 安装 Go
-
-已用 winget 安装 **Go 1.22+**（本机若尚未生效，重开终端后执行 `go version`）。
-
-### 2. 配置
+需要 Go 1.22 或更高版本。
 
 ```powershell
-cd AIGate
 Copy-Item configs\config.example.yaml configs\config.yaml
-```
-
-按需改 `configs\config.yaml` 里的 `auth.jwt_secret` / 管理员密码。
-
-### 3. 运行
-
-```powershell
-.\scripts\dev-run.ps1
-```
-
-或：
-
-```powershell
 go run .\cmd\aigate -c configs\config.yaml
 ```
 
-### 4. 验证
+浏览器打开 http://127.0.0.1:3000/ 。示例配置里的初始管理员是 `admin` / `admin123`，第一次登录后请马上修改。
 
-浏览器或 PowerShell：
+业务程序使用的地址是 `http://<主机>:3000/v1`，密钥是控制台里创建的令牌，不是厂商的 API Key。
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:3000/healthz
-```
+## 不要提交的文件
 
-## 文档索引
+`configs/config.yaml`、`data/`、`logs/`、`dist/` 已在 `.gitignore` 中。渠道密钥和数据库只留在运行这套程序的机器上。
 
-| 文档 | 说明 |
-|---|---|
-| [控制台说明](docs/01-Phase2控制台说明.md) | 打开网页从这里 |
-| [验收与本地模型](docs/01-Phase1验收与接本地模型.md) | API / Ollama 联调 |
-| [技术规格书](docs/AIGate-Pro技术规格书.md) | 产品与领域模型 |
-| [架构补丁 V4.1](docs/架构补丁-V4.1-Go与Python插件.md) | Go + Python 插件 + 本地模型 |
-| [无 Docker 部署 · Windows](docs/02-无Docker部署手册-Windows.md) | 安装步骤 |
-| [数据库备份与恢复](docs/15-数据库备份与恢复手册.md) | SQLite / MySQL |
-| [开源协议与合规](docs/06-开源协议与合规.md) | MIT；禁止把 AGPL 代码混入本仓库 |
+## 许可
 
-拉取参考代码（可选）：
-
-```powershell
-.\scripts\fetch-reference.ps1
-```
-
-## 设计原则（短）
-
-1. 主链路 **不依赖** Python 插件（fail-open）。  
-2. **本地大模型** = `openai_compatible` 渠道。  
-3. 计费：**预扣冻结 → 实结**（Phase 1）。  
-4. 排查顺序：日志 traceId → Key → 限流 → 渠道（本地/云）→ 上游。
-
-## License
-
-本仓库的服务端与网页控制台以 [MIT](LICENSE) 发布。  
-后续的本地部署客户端不在本仓库发布。  
-参考目录 `reference/one-api` 若单独拉取，仍遵循其上游 MIT 与署名要求。详见 `docs/06-开源协议与合规.md`。
+本仓库的服务端和网页控制台使用 MIT 许可，见 [LICENSE](LICENSE)。  
+从其他项目拷贝代码时，请保留对方许可要求的署名。不要把 AGPL 项目的源码混进本仓库。

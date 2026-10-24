@@ -1,5 +1,5 @@
 # AIGate 配置示例 —— 复制为 config.yaml 后修改
-# 文档：docs/02-无Docker部署手册-Windows.md
+# 文档：docs/部署与使用.md
 
 server:
   host: "0.0.0.0"
@@ -45,15 +45,13 @@ plugin:
   timeout_ms: 200
   fail_open: true
 
-# 交付形态（持续经营关键分界，见 docs/11-双模式运营模型.md）
-# onprem = 客户机房/本地大模型：Admin=组织内子账户与用量（屏蔽厂商套餐后台）
-# saas   = 网络客户端连我方 Server：强验证、套餐订阅运营
+# onprem = 自己的服务器：管理组织内账号与用量
+# saas   = 面向外部用户：套餐与订阅
 deploy:
   mode: "onprem"
   product_name: "AIGate"
 
-# 可插拔功能模块（按客户合同增删）。core/console 始终开启。
-# 详见 docs/09-可插拔交付与私有化形态.md
+# 功能开关。core / console 始终开启。
 modules:
   marketplace: true
   wallet: true
@@ -64,8 +62,7 @@ modules:
   audit: false
   plugin_runtime: false
 
-# 实例许可证（Ed25519 签名）。私钥只在你们签发端持有，永不交付客户。
-# 详见 docs/10-权益与防越狱.md
+# 可选的实例许可证（Ed25519）。不需要许可证时保持 file 为空、require 为 false。
 license:
   file: ""                 # 例如 ./configs/license.json
   public_key_b64: ""       # 发行方公钥

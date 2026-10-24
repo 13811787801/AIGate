@@ -1563,8 +1563,8 @@
         </ol>
       </div>
       <div class="panel">
-        <h3>阶段门禁</h3>
-        <p class="hint">每个阶段都执行：Mock 打通 → 商业化验收。详见文档 <code>docs/08-商业化对标与阶段门禁.md</code>。</p>
+        <h3>联网搜索</h3>
+        <p class="hint">操练场勾选「搜索后再回答」，或在 <code>/v1/chat/completions</code> 里传 <code>web_search: true</code>。目前仅 DeepSeek 渠道支持。</p>
       </div>`;
   }
 

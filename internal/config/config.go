@@ -26,8 +26,7 @@ type Config struct {
 }
 
 type DeployConfig struct {
-	// Mode: onprem = 客户机房私有化（组织内 Admin）；saas = 连我方 Server（强校验运营）
-	// 见 docs/11-双模式运营模型.md —— 持续经营关键分界
+	// Mode: onprem = 自己的服务器，管理组织内账号；saas = 套餐与订阅。
 	Mode string `yaml:"mode"`
 	ProductName string `yaml:"product_name"`
 }

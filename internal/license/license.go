@@ -12,7 +12,7 @@ import (
 )
 
 // DevPublicKeyB64 is replaced in release builds with vendor public key.
-// Paired private key MUST never ship to customers. See docs/10-权益与防越狱.md
+// Paired private key MUST never ship to customers. Leave license.file empty to run without one.
 const DevPublicKeyB64 = "" // empty => license file optional in dev
 
 type Payload struct {
