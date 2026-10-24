@@ -26,6 +26,14 @@ auth:
   admin_username: "admin"
   # 首次启动若库中无管理员，将用此密码创建（请立刻修改）
   admin_password: "admin123"
+  # Phase1 引导接口 Token；留空则禁用 X-Admin-Token（推荐）
+  bootstrap_token: ""
+
+security:
+  # 渠道上游 Key AES 派生口令（请改成足够长的随机串）
+  data_key: "CHANGE_ME_DATA_KEY"
+  # release 模式下弱密钥默认拒绝启动；紧急可 true
+  allow_insecure: false
 
 billing:
   # 预扣安全边际（相对估算费用的比例）
@@ -36,6 +44,32 @@ plugin:
   base_url: "http://127.0.0.1:3100"
   timeout_ms: 200
   fail_open: true
+
+# 交付形态（持续经营关键分界，见 docs/11-双模式运营模型.md）
+# onprem = 客户机房/本地大模型：Admin=组织内子账户与用量（屏蔽厂商套餐后台）
+# saas   = 网络客户端连我方 Server：强验证、套餐订阅运营
+deploy:
+  mode: "onprem"
+  product_name: "AIGate"
+
+# 可插拔功能模块（按客户合同增删）。core/console 始终开启。
+# 详见 docs/09-可插拔交付与私有化形态.md
+modules:
+  marketplace: true
+  wallet: true
+  playground: true
+  admin_channels: true
+  billing_online: false   # 在线支付：SaaS/对外收费才开
+  sso: false
+  audit: false
+  plugin_runtime: false
+
+# 实例许可证（Ed25519 签名）。私钥只在你们签发端持有，永不交付客户。
+# 详见 docs/10-权益与防越狱.md
+license:
+  file: ""                 # 例如 ./configs/license.json
+  public_key_b64: ""       # 发行方公钥
+  require: false           # 生产可设 true：无有效许可证则拒绝启动
 
 local_model:
   # 本地 OpenAI 兼容推理默认探测路径

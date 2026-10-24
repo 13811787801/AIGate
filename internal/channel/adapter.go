@@ -26,6 +26,8 @@ type ChatRequest struct {
 	TopP        *float64      `json:"top_p,omitempty"`
 	MaxTokens   *int          `json:"max_tokens,omitempty"`
 	Stream      bool          `json:"stream,omitempty"`
+	// WebSearch asks DeepSeek's native search tool. Omitted on the normal chat call.
+	WebSearch bool `json:"web_search,omitempty"`
 }
 
 type Usage struct {
@@ -47,7 +49,7 @@ type ChatResponse struct {
 		} `json:"message"`
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
-	Usage Usage `json:"usage"`
+	Usage Usage           `json:"usage"`
 	Raw   json.RawMessage `json:"-"`
 }
 
@@ -75,8 +77,28 @@ func NewRegistry(adapters ...Adapter) *Registry {
 	return r
 }
 
+// AdapterKind maps commercial vendor labels to a concrete adapter.
+// Most cloud vendors speak OpenAI-compatible HTTP; only mock is special-cased.
+func AdapterKind(provider string) string {
+	p := strings.TrimSpace(strings.ToLower(provider))
+	switch p {
+	case "", "openai_compatible", "custom",
+		"openai", "azure", "anthropic", "claude", "gemini", "google",
+		"deepseek", "qwen", "dashscope", "moonshot", "kimi", "zhipu", "glm",
+		"doubao", "volcengine", "baichuan", "siliconflow", "groq", "mistral",
+		"openrouter", "ollama", "minimax", "yi", "lingyi", "hunyuan", "tencent":
+		return "openai_compatible"
+	case "mock":
+		return "mock"
+	default:
+		// Unknown vendor: still try OpenAI-compatible (common commercial pattern).
+		return "openai_compatible"
+	}
+}
+
 func (r *Registry) Get(provider string) (Adapter, error) {
-	a, ok := r.byProvider[provider]
+	kind := AdapterKind(provider)
+	a, ok := r.byProvider[kind]
 	if !ok {
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -133,8 +155,8 @@ func (m MockAdapter) ChatStream(ctx context.Context, ch store.Channel, upstreamM
 		chunk := map[string]any{
 			"id": resp.ID, "object": "chat.completion.chunk", "created": resp.Created, "model": upstreamModel,
 			"choices": []map[string]any{{
-				"index": 0,
-				"delta": map[string]any{"role": "assistant", "content": content},
+				"index":         0,
+				"delta":         map[string]any{"role": "assistant", "content": content},
 				"finish_reason": nil,
 			}},
 		}
@@ -143,7 +165,7 @@ func (m MockAdapter) ChatStream(ctx context.Context, ch store.Channel, upstreamM
 		final := map[string]any{
 			"id": resp.ID, "object": "chat.completion.chunk", "created": resp.Created, "model": upstreamModel,
 			"choices": []map[string]any{{"index": 0, "delta": map[string]any{}, "finish_reason": "stop"}},
-			"usage": resp.Usage,
+			"usage":   resp.Usage,
 		}
 		b2, _ := json.Marshal(final)
 		out <- StreamChunk{Data: b2}
@@ -166,7 +188,14 @@ func (a *OpenAICompatibleAdapter) Provider() string { return "openai_compatible"
 
 func (a *OpenAICompatibleAdapter) Chat(ctx context.Context, ch store.Channel, upstreamModel string, req ChatRequest) (*ChatResponse, error) {
 	req.Model = upstreamModel
+	if req.WebSearch {
+		if !deepSeekSearch(ch) {
+			return nil, fmt.Errorf("联网搜索目前只支持 DeepSeek 渠道")
+		}
+		return a.chatWithWebSearch(ctx, ch, upstreamModel, req)
+	}
 	req.Stream = false
+	req.WebSearch = false
 	body, _ := json.Marshal(req)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, joinURL(ch.BaseURL, "/chat/completions"), bytes.NewReader(body))
 	if err != nil {
@@ -209,8 +238,16 @@ func (a *OpenAICompatibleAdapter) Chat(ctx context.Context, ch store.Channel, up
 }
 
 func (a *OpenAICompatibleAdapter) ChatStream(ctx context.Context, ch store.Channel, upstreamModel string, req ChatRequest) (<-chan StreamChunk, error) {
+	if req.WebSearch {
+		resp, err := a.Chat(ctx, ch, upstreamModel, req)
+		if err != nil {
+			return nil, err
+		}
+		return streamOneShot(resp), nil
+	}
 	req.Model = upstreamModel
 	req.Stream = true
+	req.WebSearch = false
 	body, _ := json.Marshal(req)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, joinURL(ch.BaseURL, "/chat/completions"), bytes.NewReader(body))
 	if err != nil {
@@ -258,6 +295,41 @@ func (a *OpenAICompatibleAdapter) ChatStream(ctx context.Context, ch store.Chann
 	return out, nil
 }
 
+// ListModelIDs calls the OpenAI-compatible GET /models endpoint.
+func (a *OpenAICompatibleAdapter) ListModelIDs(ctx context.Context, ch store.Channel) ([]string, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, joinURL(ch.BaseURL, "/models"), nil)
+	if err != nil {
+		return nil, err
+	}
+	if ch.APIKeyEnc != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+ch.APIKeyEnc)
+	}
+	res, err := a.clientFor(ch).Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode >= 300 {
+		return nil, fmt.Errorf("upstream %d: %s", res.StatusCode, truncate(string(raw), 500))
+	}
+	var payload struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(payload.Data))
+	for _, item := range payload.Data {
+		if id := strings.TrimSpace(item.ID); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
 func (a *OpenAICompatibleAdapter) clientFor(ch store.Channel) *http.Client {
 	timeout := time.Duration(ch.TimeoutMs) * time.Millisecond
 	if timeout <= 0 {
@@ -301,6 +373,58 @@ func estimateTokens(s string) int {
 		t = 1
 	}
 	return t
+}
+
+// PickProbeModel chooses a real upstream model for a connectivity chat.
+// ids comes from GET /models; an empty list falls back to a vendor default.
+// Never returns the placeholder name "ping".
+func PickProbeModel(provider string, ids []string) string {
+	available := map[string]struct{}{}
+	var first string
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		if first == "" {
+			first = id
+		}
+		available[id] = struct{}{}
+	}
+	for _, name := range probePreferences(provider) {
+		if _, ok := available[name]; ok {
+			return name
+		}
+	}
+	if first != "" {
+		return first
+	}
+	prefs := probePreferences(provider)
+	if len(prefs) > 0 {
+		return prefs[0]
+	}
+	return "gpt-4o-mini"
+}
+
+func probePreferences(provider string) []string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "mock":
+		return []string{"mock-chat"}
+	case "deepseek":
+		return []string{"deepseek-flash", "deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"}
+	case "qwen", "dashscope":
+		return []string{"qwen-turbo", "qwen-plus"}
+	case "moonshot", "kimi":
+		return []string{"moonshot-v1-8k", "moonshot-v1-32k"}
+	case "zhipu", "glm":
+		return []string{"glm-4-flash", "glm-4"}
+	case "openai":
+		return []string{"gpt-4o-mini", "gpt-4o"}
+	case "ollama":
+		return []string{"llama3.2", "qwen2.5"}
+	default:
+		return nil
+	}
 }
 
 func truncate(s string, n int) string {

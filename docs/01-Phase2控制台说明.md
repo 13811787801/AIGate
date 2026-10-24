@@ -1,52 +1,51 @@
 # Phase 2 控制台说明
 
-## 你现在打开什么？
-
-浏览器 / Cursor 预览请打开：
+## 打开地址
 
 **http://127.0.0.1:3000/**
-
-这是 **AIGate 控制台网页**（登录后有侧边栏），不再只是 `/healthz` 的 JSON。
 
 | 地址 | 是什么 |
 |---|---|
 | `/` | 控制台 UI（要登录） |
-| `/healthz` | 探活 JSON（给运维/脚本） |
-| `/v1/...` | OpenAI 兼容 API（给 SDK/Cursor） |
+| `/healthz` | 探活 JSON |
+| `/v1/...` | OpenAI 兼容 API |
 
 ## 默认登录
 
-- 用户名：`admin`（或 `configs/config.yaml` 里的 `admin_username`）
-- 密码：`admin123`（`admin_password`）
+- 用户名：`admin`
+- 密码：`admin123`（见 `configs/config.yaml`）
 
-## 页面结构
+## 页面（对标商业信息架构）
 
 **用户侧**
 
-- 总览：余额与接入说明  
-- 对话调试：选模型发消息（先可用 `mock-chat`）  
-- 令牌管理：创建/删除 `sk-` 密钥  
-- 使用日志 / 钱包  
+- 数据看板 / 模型广场 / 操练场  
+- 令牌：名称、RPM/TPM、过期、模型白名单、IP 白名单、启停  
+- 日志 / 钱包（兑换码充值）
 
-**管理侧（admin）**
+**管理侧**
 
-- 渠道配置：接入 DeepSeek / OpenAI 等 `openai_compatible`  
-- 模型配置：对外模型名绑定渠道与单价  
+- 渠道：主流厂商下拉、启停、连通测试  
+- 模型：发布、上架/下架  
+
+## 演示兑换码
+
+| 码 | 金额 | 说明 |
+|---|---|---|
+| `AIGATE-WELCOME` | ¥10 | 每用户限兑一次 |
+| `AIGATE-DEMO-100` | ¥100 | 每用户限兑一次 |
+
+## 推荐配置顺序
+
+1. 渠道管理 → 选厂商 → 填 Key → **测试**  
+2. 模型管理 → 发布对外模型并定价  
+3. 令牌管理 → 创建业务 Key  
+4. 钱包 → 兑换码（可选）  
+5. 客户端 Base URL：`http://服务器:3000/v1`
 
 ## 启动
 
 ```powershell
 cd E:\Projects\AIGate
 .\scripts\start-background.ps1
-# 然后浏览器打开 http://127.0.0.1:3000/
 ```
-
-## 推荐配置顺序（接真实大模型）
-
-1. 登录控制台  
-2. **渠道配置** → 填 DeepSeek/OpenAI 的 Base URL + 上游 Key  
-3. **模型配置** → 新建对外模型并绑定该渠道  
-4. **令牌管理** → 创建业务用 Key  
-5. 业务侧 Base URL 指向 `http://服务器:3000/v1`  
-
-Ollama 仍可作为备选渠道，同一套「渠道 + 模型」流程即可。

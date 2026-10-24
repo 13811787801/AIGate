@@ -16,6 +16,9 @@ import (
 	"aigate/internal/billing"
 	"aigate/internal/channel"
 	"aigate/internal/config"
+	"aigate/internal/crypto"
+	"aigate/internal/entitlement"
+	"aigate/internal/license"
 	"aigate/internal/ratelimit"
 	"aigate/internal/router"
 	"aigate/internal/store"
@@ -30,6 +33,9 @@ type App struct {
 	Router   *router.Service
 	Adapters *channel.Registry
 	Limit    *ratelimit.Limiter
+	Ent      *entitlement.Service
+	Lic      license.State
+	DataKey  []byte
 }
 
 func Run(cfg *config.Config) error {
@@ -48,6 +54,41 @@ func Run(cfg *config.Config) error {
 		log.Printf("%s", seed.DemoAPIKey)
 		log.Printf("========================================================")
 	}
+	if err := st.SeedRedeemCodes(); err != nil {
+		return fmt.Errorf("seed redeem codes: %w", err)
+	}
+	if err := st.SeedPlans(); err != nil {
+		return fmt.Errorf("seed plans: %w", err)
+	}
+
+	lic := license.Load(cfg.License.File, cfg.License.PublicKeyB64)
+	if cfg.License.Require && (!lic.Loaded || !lic.Valid) {
+		return fmt.Errorf("license required but invalid: %s", lic.Reason)
+	}
+	if lic.Loaded {
+		log.Printf("license: valid=%v msg=%s customer=%s", lic.Valid, lic.Reason, lic.Payload.Customer)
+	}
+	if weak := cfg.WeakSecrets(); len(weak) > 0 {
+		for _, w := range weak {
+			log.Printf("SECURITY WARNING: %s", w)
+		}
+	}
+	if err := cfg.EnforceSecurity(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(cfg.Auth.BootstrapToken) == "" {
+		log.Printf("bootstrap admin API disabled (auth.bootstrap_token empty) — use JWT console")
+	} else {
+		log.Printf("bootstrap admin API enabled via auth.bootstrap_token")
+	}
+	if lic.Valid && lic.MaxUsers > 0 {
+		n, _ := st.CountUsers()
+		if n > lic.MaxUsers {
+			log.Printf("WARNING: user count %d exceeds license max_users %d", n, lic.MaxUsers)
+		}
+	}
+
+	ent := &entitlement.Service{Store: st, Instance: cfg.Modules, License: lic}
 
 	app := &App{
 		Cfg:   cfg,
@@ -60,6 +101,9 @@ func Run(cfg *config.Config) error {
 		Router:   &router.Service{Store: st},
 		Adapters: channel.NewRegistry(channel.MockAdapter{}, channel.NewOpenAICompatible()),
 		Limit:    ratelimit.New(),
+		Ent:      ent,
+		Lic:      lic,
+		DataKey:  cfg.DataKeyBytes(),
 	}
 
 	mux := http.NewServeMux()
@@ -75,14 +119,27 @@ func Run(cfg *config.Config) error {
 	// Phase2 console API (JWT)
 	mux.HandleFunc("/api/auth/login", app.handleLogin)
 	mux.HandleFunc("/api/me", app.handleMe)
+	mux.HandleFunc("/api/session", app.handleSession)
+	mux.HandleFunc("/api/modules", app.handleModules)
 	mux.HandleFunc("/api/wallet", app.handleConsoleWallet)
+	mux.HandleFunc("/api/wallet/redeem", app.handleWalletRedeem)
 	mux.HandleFunc("/api/keys", app.handleConsoleKeys)
 	mux.HandleFunc("/api/logs", app.handleConsoleLogs)
 	mux.HandleFunc("/api/models", app.handleConsoleModels)
 	mux.HandleFunc("/api/chat", app.handleConsoleChat)
+	mux.HandleFunc("/api/chat/sessions", app.handleChatSessions)
 	mux.HandleFunc("/api/admin/overview", app.handleAdminOverview)
 	mux.HandleFunc("/api/admin/console/channels", app.handleAdminChannelsJWT)
+	mux.HandleFunc("/api/admin/console/channels/test", app.handleAdminChannelTest)
 	mux.HandleFunc("/api/admin/console/models", app.handleAdminModelsJWT)
+	mux.HandleFunc("/api/admin/plans", app.handleAdminPlans)
+	mux.HandleFunc("/api/admin/users", app.handleAdminUsers)
+	mux.HandleFunc("/api/org/usage", app.handleOrgUsage)
+	mux.HandleFunc("/api/org/roles", app.handleOrgRoles)
+	mux.HandleFunc("/api/billing/catalog", app.handleBillingCatalog)
+	mux.HandleFunc("/api/billing/orders", app.handleBillingOrders)
+	mux.HandleFunc("/api/billing/orders/mock-pay", app.handleBillingMockPay)
+	mux.HandleFunc("/api/admin/billing/orders", app.handleAdminBillingOrders)
 
 	mux.Handle("/", consoleFileServer())
 
@@ -97,7 +154,8 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":  "ok",
 		"service": "aigate",
-		"phase":   2,
+		"phase":   3,
+		"deploy":  a.Cfg.Deploy.Mode,
 		"time":    time.Now().UTC().Format(time.RFC3339),
 	})
 }
@@ -200,6 +258,11 @@ func (a *App) handleChat(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var lastErr error
 	for _, mc := range candidates {
+		mc, err := a.unlockModelChannel(mc)
+		if err != nil {
+			lastErr = err
+			continue
+		}
 		adapter, err := a.Adapters.Get(mc.Channel.Provider)
 		if err != nil {
 			lastErr = err
@@ -335,15 +398,41 @@ func (a *App) logReq(p *auth.Principal, model string, channelID int64, in, out i
 	})
 }
 
-// --- admin bootstrap (Phase1: X-Admin-Token = admin password) ---
+// --- admin bootstrap (M3: X-Admin-Token must equal auth.bootstrap_token; empty = disabled) ---
 
 func (a *App) checkAdmin(r *http.Request) bool {
-	return r.Header.Get("X-Admin-Token") == a.Cfg.Auth.AdminPassword
+	tok := strings.TrimSpace(a.Cfg.Auth.BootstrapToken)
+	if tok == "" {
+		return false
+	}
+	return r.Header.Get("X-Admin-Token") == tok
+}
+
+func (a *App) sealAPIKey(plain string) (string, error) {
+	return crypto.Seal(a.DataKey, plain)
+}
+
+func (a *App) openChannel(ch store.Channel) (store.Channel, error) {
+	pt, err := crypto.Open(a.DataKey, ch.APIKeyEnc)
+	if err != nil {
+		return ch, err
+	}
+	ch.APIKeyEnc = pt
+	return ch, nil
+}
+
+func (a *App) unlockModelChannel(mc store.ModelChannel) (store.ModelChannel, error) {
+	ch, err := a.openChannel(mc.Channel)
+	if err != nil {
+		return mc, err
+	}
+	mc.Channel = ch
+	return mc, nil
 }
 
 func (a *App) handleAdminChannels(w http.ResponseWriter, r *http.Request) {
 	if !a.checkAdmin(r) {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized", "hint": "set auth.bootstrap_token and pass X-Admin-Token"})
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -363,19 +452,7 @@ func (a *App) handleAdminChannels(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "bad json"})
 		return
 	}
-	if body.Provider == "" {
-		body.Provider = "openai_compatible"
-	}
-	if body.Weight == 0 {
-		body.Weight = 100
-	}
-	if body.TimeoutMs == 0 {
-		body.TimeoutMs = 120000
-	}
-	id, err := a.Store.CreateChannel(store.Channel{
-		Name: body.Name, Provider: body.Provider, BaseURL: body.BaseURL, APIKeyEnc: body.APIKey,
-		Weight: body.Weight, Priority: body.Priority, Status: 1, TimeoutMs: body.TimeoutMs,
-	})
+	id, err := a.createChannelFromBody(body.Name, body.Provider, body.BaseURL, body.APIKey, body.Weight, body.Priority, body.TimeoutMs)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
@@ -383,9 +460,29 @@ func (a *App) handleAdminChannels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"id": id})
 }
 
+func (a *App) createChannelFromBody(name, provider, baseURL, apiKey string, weight, priority, timeoutMs int) (int64, error) {
+	if provider == "" {
+		provider = "custom"
+	}
+	if weight == 0 {
+		weight = 100
+	}
+	if timeoutMs == 0 {
+		timeoutMs = 120000
+	}
+	sealed, err := a.sealAPIKey(apiKey)
+	if err != nil {
+		return 0, err
+	}
+	return a.Store.CreateChannel(store.Channel{
+		Name: name, Provider: provider, BaseURL: baseURL, APIKeyEnc: sealed,
+		Weight: weight, Priority: priority, Status: 1, TimeoutMs: timeoutMs,
+	})
+}
+
 func (a *App) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 	if !a.checkAdmin(r) {
-		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized", "hint": "set auth.bootstrap_token"})
 		return
 	}
 	if r.Method != http.MethodPost {
@@ -407,35 +504,52 @@ func (a *App) handleAdminModels(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "bad json"})
 		return
 	}
-	if body.BillingMode == "" {
-		body.BillingMode = "TOKEN"
-	}
-	if body.MaxTokens == 0 {
-		body.MaxTokens = 8192
-	}
-	if body.UpstreamModel == "" {
-		body.UpstreamModel = body.ModelName
-	}
-	if body.GroupID == 0 {
-		body.GroupID = 1
-	}
-	id, err := a.Store.CreateModel(store.ModelConfig{
-		ModelName: body.ModelName, DisplayName: body.DisplayName, BillingMode: body.BillingMode,
-		InputPricePer1K: body.InputPricePer1K, OutputPricePer1K: body.OutputPricePer1K,
-		MaxTokens: body.MaxTokens, SupportsStream: true, Enabled: true,
-	})
+	id, err := a.createModelFromBody(body.ModelName, body.DisplayName, body.BillingMode, body.InputPricePer1K, body.OutputPricePer1K, body.MaxTokens, body.ChannelID, body.UpstreamModel, body.GroupID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		code := http.StatusInternalServerError
+		if err.Error() == "model_name required" {
+			code = http.StatusBadRequest
+		}
+		writeJSON(w, code, map[string]any{"error": err.Error()})
 		return
 	}
-	if body.ChannelID > 0 {
-		if err := a.Store.BindModelChannel(id, body.ChannelID, body.UpstreamModel, 100); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
-			return
+	writeJSON(w, http.StatusOK, map[string]any{"id": id})
+}
+
+func (a *App) createModelFromBody(modelName, displayName, billingMode string, inPrice, outPrice float64, maxTokens int, channelID int64, upstream string, groupID int64) (int64, error) {
+	modelName = strings.TrimSpace(modelName)
+	displayName = strings.TrimSpace(displayName)
+	upstream = strings.TrimSpace(upstream)
+	if modelName == "" {
+		return 0, fmt.Errorf("model_name required")
+	}
+	if billingMode == "" {
+		billingMode = "TOKEN"
+	}
+	if maxTokens == 0 {
+		maxTokens = 8192
+	}
+	if upstream == "" {
+		upstream = modelName
+	}
+	if groupID == 0 {
+		groupID = 1
+	}
+	id, err := a.Store.CreateModel(store.ModelConfig{
+		ModelName: modelName, DisplayName: displayName, BillingMode: billingMode,
+		InputPricePer1K: inPrice, OutputPricePer1K: outPrice,
+		MaxTokens: maxTokens, SupportsStream: true, Enabled: true,
+	})
+	if err != nil {
+		return 0, err
+	}
+	if channelID > 0 {
+		if err := a.Store.BindModelChannel(id, channelID, upstream, 100); err != nil {
+			return 0, err
 		}
 	}
-	_ = a.Store.BindGroupModel(body.GroupID, id)
-	writeJSON(w, http.StatusOK, map[string]any{"id": id})
+	_ = a.Store.BindGroupModel(groupID, id)
+	return id, nil
 }
 
 func (a *App) handleAdminWallet(w http.ResponseWriter, r *http.Request) {

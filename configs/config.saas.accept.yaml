@@ -1,0 +1,38 @@
+﻿server:
+  host: "127.0.0.1"
+  port: 3001
+  mode: "debug"
+database:
+  driver: "sqlite"
+  sqlite_path: "./data/saas-accept/aigate.db"
+auth:
+  jwt_secret: "saas-accept-jwt-secret-32chars!!"
+  admin_username: "admin"
+  admin_password: "admin123"
+  bootstrap_token: ""
+security:
+  data_key: "saas-accept-data-key-32chars!!"
+  allow_insecure: true
+billing:
+  freeze_margin: 1.2
+deploy:
+  mode: "saas"
+  product_name: "AIGate-SaaS-Accept"
+modules:
+  marketplace: true
+  wallet: true
+  playground: true
+  admin_channels: true
+  billing_online: false
+  sso: false
+  audit: false
+  plugin_runtime: false
+license:
+  file: ""
+  public_key_b64: ""
+  require: false
+plugin:
+  enabled: false
+log:
+  level: "info"
+  file: "./logs/saas-accept.log"

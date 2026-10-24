@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound  = errors.New("not found")
+	ErrDuplicate = errors.New("model name already exists")
+)
 
 type UserGroup struct {
 	ID          int64
@@ -27,6 +30,11 @@ type User struct {
 	Balance       float64
 	Frozen        float64
 	TotalConsumed float64
+	PlanID        int64
+	Role          string
+	ParentID      int64 // 0 = top-level; >0 = sub-account of parent
+	OrgRole       string
+	PermsJSON     string // org ACL JSON map; empty = use org_role preset only
 }
 
 type APIKey struct {
@@ -51,7 +59,7 @@ type Channel struct {
 	Name      string
 	Provider  string
 	BaseURL   string
-	APIKeyEnc string // Phase1: plaintext in DB for local/dev; encrypt in later phase
+	APIKeyEnc string // M3+: AES-GCM sealed (enc:v1:...); legacy plaintext still readable
 	Weight    int
 	Priority  int
 	Status    int
@@ -59,16 +67,16 @@ type Channel struct {
 }
 
 type ModelConfig struct {
-	ID                int64
-	ModelName         string
-	DisplayName       string
-	BillingMode       string
-	InputPricePer1K   float64
-	OutputPricePer1K  float64
-	PricePerRequest   sql.NullFloat64
-	MaxTokens         int
-	SupportsStream    bool
-	Enabled           bool
+	ID               int64
+	ModelName        string
+	DisplayName      string
+	BillingMode      string
+	InputPricePer1K  float64
+	OutputPricePer1K float64
+	PricePerRequest  sql.NullFloat64
+	MaxTokens        int
+	SupportsStream   bool
+	Enabled          bool
 }
 
 type ModelChannel struct {
@@ -94,9 +102,11 @@ func (s *Store) GetGroup(id int64) (*UserGroup, error) {
 }
 
 func (s *Store) GetUser(id int64) (*User, error) {
-	row := s.DB.QueryRow(`SELECT id, username, password_hash, COALESCE(display_name,''), group_id, status, balance, frozen, total_consumed FROM user WHERE id=?`, id)
+	row := s.DB.QueryRow(`SELECT id, username, password_hash, COALESCE(display_name,''), group_id, status, balance, frozen, total_consumed,
+COALESCE(plan_id,0), COALESCE(role,'user'), COALESCE(parent_id,0),
+COALESCE(org_role,'member'), COALESCE(perms_json,'') FROM `+tblUser+` WHERE id=?`, id)
 	var u User
-	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.GroupID, &u.Status, &u.Balance, &u.Frozen, &u.TotalConsumed); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.DisplayName, &u.GroupID, &u.Status, &u.Balance, &u.Frozen, &u.TotalConsumed, &u.PlanID, &u.Role, &u.ParentID, &u.OrgRole, &u.PermsJSON); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -215,7 +225,7 @@ func (s *Store) FreezeBalance(userID int64, amount float64, apiKeyID int64, refI
 	defer func() { _ = tx.Rollback() }()
 
 	var balance, frozen float64
-	if err := tx.QueryRow(`SELECT balance, frozen FROM user WHERE id=?`, userID).Scan(&balance, &frozen); err != nil {
+	if err := tx.QueryRow(`SELECT balance, frozen FROM `+tblUser+` WHERE id=?`, userID).Scan(&balance, &frozen); err != nil {
 		return err
 	}
 	if balance < amount {
@@ -223,7 +233,7 @@ func (s *Store) FreezeBalance(userID int64, amount float64, apiKeyID int64, refI
 	}
 	balance -= amount
 	frozen += amount
-	if _, err := tx.Exec(`UPDATE user SET balance=?, frozen=?, updated_at=? WHERE id=?`, balance, frozen, Now(), userID); err != nil {
+	if _, err := tx.Exec(`UPDATE `+tblUser+` SET balance=?, frozen=?, updated_at=? WHERE id=?`, balance, frozen, Now(), userID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`INSERT INTO balance_ledger(user_id, api_key_id, change_amt, balance_after, reason, ref_id, created_at)
@@ -241,7 +251,7 @@ func (s *Store) SettleBalance(userID int64, frozenAmt, actualCost float64, apiKe
 	defer func() { _ = tx.Rollback() }()
 
 	var balance, frozen, total float64
-	if err := tx.QueryRow(`SELECT balance, frozen, total_consumed FROM user WHERE id=?`, userID).Scan(&balance, &frozen, &total); err != nil {
+	if err := tx.QueryRow(`SELECT balance, frozen, total_consumed FROM `+tblUser+` WHERE id=?`, userID).Scan(&balance, &frozen, &total); err != nil {
 		return err
 	}
 	if frozen < frozenAmt {
@@ -255,7 +265,7 @@ func (s *Store) SettleBalance(userID int64, frozenAmt, actualCost float64, apiKe
 	}
 	balance -= actualCost
 	total += actualCost
-	if _, err := tx.Exec(`UPDATE user SET balance=?, frozen=?, total_consumed=?, updated_at=? WHERE id=?`,
+	if _, err := tx.Exec(`UPDATE `+tblUser+` SET balance=?, frozen=?, total_consumed=?, updated_at=? WHERE id=?`,
 		balance, frozen, total, Now(), userID); err != nil {
 		return err
 	}
@@ -277,7 +287,7 @@ func (s *Store) UnfreezeBalance(userID int64, amount float64, apiKeyID int64, re
 	}
 	defer func() { _ = tx.Rollback() }()
 	var balance, frozen float64
-	if err := tx.QueryRow(`SELECT balance, frozen FROM user WHERE id=?`, userID).Scan(&balance, &frozen); err != nil {
+	if err := tx.QueryRow(`SELECT balance, frozen FROM `+tblUser+` WHERE id=?`, userID).Scan(&balance, &frozen); err != nil {
 		return err
 	}
 	if frozen < amount {
@@ -285,7 +295,7 @@ func (s *Store) UnfreezeBalance(userID int64, amount float64, apiKeyID int64, re
 	}
 	frozen -= amount
 	balance += amount
-	if _, err := tx.Exec(`UPDATE user SET balance=?, frozen=?, updated_at=? WHERE id=?`, balance, frozen, Now(), userID); err != nil {
+	if _, err := tx.Exec(`UPDATE `+tblUser+` SET balance=?, frozen=?, updated_at=? WHERE id=?`, balance, frozen, Now(), userID); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`INSERT INTO balance_ledger(user_id, api_key_id, change_amt, balance_after, reason, ref_id, created_at)
@@ -334,7 +344,7 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 func (s *Store) Count() (groups, users, keys, channels, models int, err error) {
 	err = s.DB.QueryRow(`SELECT
 (SELECT COUNT(1) FROM user_group),
-(SELECT COUNT(1) FROM user),
+(SELECT COUNT(1) FROM `+tblUser+`),
 (SELECT COUNT(1) FROM api_key),
 (SELECT COUNT(1) FROM channel),
 (SELECT COUNT(1) FROM model_config)`).Scan(&groups, &users, &keys, &channels, &models)
@@ -369,14 +379,11 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?)`, m.ModelName, m.DisplayName, m.BillingMode, m.Inp
 }
 
 func (s *Store) BindModelChannel(modelID, channelID int64, upstream string, weight int) error {
-	_, err := s.DB.Exec(`INSERT OR REPLACE INTO model_channel(model_config_id,channel_id,upstream_model,weight,enabled)
-VALUES(?,?,?,?,1)`, modelID, channelID, upstream, weight)
-	return err
+	return s.execBindModelChannel(modelID, channelID, upstream, weight)
 }
 
 func (s *Store) BindGroupModel(groupID, modelID int64) error {
-	_, err := s.DB.Exec(`INSERT OR IGNORE INTO group_model(group_id, model_config_id) VALUES(?,?)`, groupID, modelID)
-	return err
+	return s.execBindGroupModel(groupID, modelID)
 }
 
 type InsufficientBalanceError struct {

@@ -108,4 +108,6 @@ Invoke-RestMethod http://127.0.0.1:3000/healthz
 
 ## License
 
-本仓库业务代码默认专有（私有化交付）；参考目录 `reference/one-api` 遵循其 MIT 协议与署名要求。详见 `docs/06-开源协议与合规.md`。
+本仓库的服务端与网页控制台以 [MIT](LICENSE) 发布。  
+后续的本地部署客户端不在本仓库发布。  
+参考目录 `reference/one-api` 若单独拉取，仍遵循其上游 MIT 与署名要求。详见 `docs/06-开源协议与合规.md`。

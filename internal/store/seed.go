@@ -28,8 +28,8 @@ func (s *Store) SeedIfEmpty(adminUser, adminPass string) (*SeedResult, error) {
 	if _, err := s.DB.Exec(`INSERT INTO user_group(id,name,multiplier,description,created_at) VALUES(1,'default',1.0,'默认分组',?)`, now); err != nil {
 		return nil, err
 	}
-	res, err := s.DB.Exec(`INSERT INTO user(username,password_hash,display_name,group_id,status,balance,frozen,total_consumed,created_at,updated_at)
-VALUES(?,?,?,1,1,100,0,0,?,?)`, adminUser, hashPassword(adminPass), "Administrator", now, now)
+	res, err := s.DB.Exec(`INSERT INTO ` + tblUser + `(username,password_hash,display_name,group_id,status,balance,frozen,total_consumed,role,created_at,updated_at)
+VALUES(?,?,?,1,1,100,0,0,'admin',?,?)`, adminUser, hashPassword(adminPass), "Administrator", now, now)
 	if err != nil {
 		return nil, err
 	}

@@ -1,8 +1,11 @@
 package config
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
+
+	"aigate/internal/modules"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,6 +19,23 @@ type Config struct {
 	Plugin     PluginConfig     `yaml:"plugin"`
 	LocalModel LocalModelConfig `yaml:"local_model"`
 	Log        LogConfig        `yaml:"log"`
+	Modules    modules.Flags    `yaml:"modules"`
+	Deploy     DeployConfig     `yaml:"deploy"`
+	License    LicenseConfig    `yaml:"license"`
+	Security   SecurityConfig   `yaml:"security"`
+}
+
+type DeployConfig struct {
+	// Mode: onprem = 客户机房私有化（组织内 Admin）；saas = 连我方 Server（强校验运营）
+	// 见 docs/11-双模式运营模型.md —— 持续经营关键分界
+	Mode string `yaml:"mode"`
+	ProductName string `yaml:"product_name"`
+}
+
+type LicenseConfig struct {
+	File         string `yaml:"file"`           // path to signed license.json
+	PublicKeyB64 string `yaml:"public_key_b64"` // ed25519 public key (base64)
+	Require      bool   `yaml:"require"`        // if true, refuse start when license invalid
 }
 
 type ServerConfig struct {
@@ -38,9 +58,18 @@ type RedisConfig struct {
 }
 
 type AuthConfig struct {
-	JWTSecret     string `yaml:"jwt_secret"`
-	AdminUsername string `yaml:"admin_username"`
-	AdminPassword string `yaml:"admin_password"`
+	JWTSecret      string `yaml:"jwt_secret"`
+	AdminUsername  string `yaml:"admin_username"`
+	AdminPassword  string `yaml:"admin_password"`
+	// BootstrapToken: Phase1 X-Admin-Token. Empty = disabled (recommended).
+	BootstrapToken string `yaml:"bootstrap_token"`
+}
+
+type SecurityConfig struct {
+	// DataKey: passphrase for AES-GCM channel secrets (derived via SHA-256).
+	DataKey string `yaml:"data_key"`
+	// AllowInsecure: if true, skip weak-secret hard fail even in release (not recommended).
+	AllowInsecure bool `yaml:"allow_insecure"`
 }
 
 type BillingConfig struct {
@@ -68,7 +97,12 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	var cfg Config
+	// Start with product defaults so omitted modules.* keep SKU defaults;
+	// explicit false in YAML still overrides.
+	cfg := Config{
+		Modules: modules.Default(),
+		Deploy:  DeployConfig{Mode: "onprem", ProductName: "AIGate"},
+	}
 	if err := yaml.Unmarshal(b, &cfg); err != nil {
 		return nil, err
 	}
@@ -110,14 +144,17 @@ func (c *Config) applyDefaults() {
 	if c.Log.File == "" {
 		c.Log.File = "./logs/aigate.log"
 	}
+	if c.Deploy.Mode == "" {
+		c.Deploy.Mode = "onprem"
+	}
+	if c.Deploy.ProductName == "" {
+		c.Deploy.ProductName = "AIGate"
+	}
 }
 
 func (c *Config) validate() error {
-	if c.Auth.JWTSecret == "" || c.Auth.JWTSecret == "CHANGE_ME_TO_A_LONG_RANDOM_STRING" {
-		// 允许开发启动，但打印警告由调用方处理；这里仅硬性要求非空
-		if c.Auth.JWTSecret == "" {
-			return fmt.Errorf("auth.jwt_secret is required")
-		}
+	if c.Auth.JWTSecret == "" {
+		return fmt.Errorf("auth.jwt_secret is required")
 	}
 	if c.Auth.AdminUsername == "" {
 		return fmt.Errorf("auth.admin_username is required")
@@ -127,4 +164,41 @@ func (c *Config) validate() error {
 
 func (c *Config) Addr() string {
 	return fmt.Sprintf("%s:%d", c.Server.Host, c.Server.Port)
+}
+
+// WeakSecrets reports insecure defaults that must not ship to production.
+func (c *Config) WeakSecrets() []string {
+	var out []string
+	if c.Auth.JWTSecret == "" || c.Auth.JWTSecret == "CHANGE_ME_TO_A_LONG_RANDOM_STRING" || len(c.Auth.JWTSecret) < 16 {
+		out = append(out, "auth.jwt_secret is weak or default")
+	}
+	if c.Auth.AdminPassword == "" || c.Auth.AdminPassword == "admin123" {
+		out = append(out, "auth.admin_password is default/empty (admin123)")
+	}
+	if c.Security.DataKey == "" || c.Security.DataKey == "CHANGE_ME_DATA_KEY" || len(c.Security.DataKey) < 16 {
+		out = append(out, "security.data_key is weak or default")
+	}
+	return out
+}
+
+// EnforceSecurity fails startup in release when secrets are weak (unless allow_insecure).
+func (c *Config) EnforceSecurity() error {
+	weak := c.WeakSecrets()
+	if len(weak) == 0 {
+		return nil
+	}
+	if c.Server.Mode == "release" && !c.Security.AllowInsecure {
+		return fmt.Errorf("insecure config in release mode: %v (set strong secrets or security.allow_insecure: true for emergency)", weak)
+	}
+	return nil
+}
+
+func (c *Config) DataKeyBytes() []byte {
+	key := c.Security.DataKey
+	if key == "" {
+		// Dev fallback: derive from jwt_secret so local works; release must set data_key.
+		key = c.Auth.JWTSecret
+	}
+	sum := sha256.Sum256([]byte("aigate-data:" + key))
+	return sum[:]
 }
